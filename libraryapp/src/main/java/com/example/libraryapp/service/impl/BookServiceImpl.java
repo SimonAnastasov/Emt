@@ -83,6 +83,18 @@ public class BookServiceImpl implements BookService {
             throw new BookCategoryNotInEnumeration();
         }
 
+        if (bookDto.getAvailableCopies() < 0) {
+            throw new AvailableCopiesCannotBeANegativeNumber();
+        }
+
+        if (bookDto.getCurrentlyTaken() < 0) {
+            throw new CurrentlyTakenCopiesCannotBeANegativeNumber();
+        }
+
+        if (bookDto.getCurrentlyTaken() > bookDto.getAvailableCopies()) {
+            throw new CurrentlyTakenCopiesCannotBeALargerNumberThanAvailableCopies();
+        }
+
 
         return this.bookRepository.save(new Book(bookDto.getName(), category, author, bookDto.getAvailableCopies(), bookDto.getCurrentlyTaken()));
 

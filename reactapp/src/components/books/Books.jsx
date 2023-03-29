@@ -16,11 +16,6 @@ const Books = ({ toastNotification, setToastNotification }) => {
     const booksFooterRow = [{name: "", category: "", author: "", availableCopies: "", currentlyTaken: ""}]
 
     useEffect(() => {
-        BookService.fetchAllBooks()
-            .then(data => {
-                setBooks(booksHeaderRow.concat(data.data).concat(booksFooterRow));
-            });
-
         BookService.fetchAllBookCategories()
             .then(data => {
                 setCategories(data.data);
@@ -30,7 +25,16 @@ const Books = ({ toastNotification, setToastNotification }) => {
             .then(data => {
                 setAuthors(data.data);
             });
+    }, []);
 
+    useEffect(() => {
+        BookService.fetchAllBooks()
+            .then(data => {
+                setBooks(booksHeaderRow.concat(data.data).concat(booksFooterRow));
+            });
+    }, [updateSwitch]);
+
+    useEffect(() => {
         let timeout = false;
         if (markForDeleteId !== -1) {
             timeout = setTimeout(() => {
@@ -41,7 +45,7 @@ const Books = ({ toastNotification, setToastNotification }) => {
         return () => {
             if (timeout) clearTimeout(timeout);
         }
-    }, [updateSwitch, markForDeleteId])
+    }, [markForDeleteId]);
 
     function editBook(id) {
         let idx = books.map(e => e.id).indexOf(id);
@@ -84,27 +88,31 @@ const Books = ({ toastNotification, setToastNotification }) => {
 
     function handleKeyPressBookEdit(e) {
         if (e.key === 'Enter') {
-            BookService.saveOrEditBook(bookEditingDto.id, bookEditingDto.name, bookEditingDto.author?.id, bookEditingDto.category, bookEditingDto.availableCopies, bookEditingDto.currentlyTaken)
-                .then(data => {
-                    setUpdateSwitch(!updateSwitch);
+            saveOrEditBook();
+        }
+    }
+
+    function saveOrEditBook() {
+        BookService.saveOrEditBook(bookEditingDto.id, bookEditingDto.name, bookEditingDto.author?.id, bookEditingDto.category, bookEditingDto.availableCopies, bookEditingDto.currentlyTaken)
+            .then(data => {
+                setUpdateSwitch(!updateSwitch);
+                setToastNotification({
+                    show: true,
+                    status: "success",
+                    text: bookEditingDto.id !== undefined && typeof bookEditingDto.id === "number" ? `Successfully edited book` : `Successfully created book`
+                })
+                setEditRowIdx(-1);
+            })
+            .catch(error => {
+                let data = error.response.data;
+                if (data.errorMessage) {
                     setToastNotification({
                         show: true,
-                        status: "success",
-                        text: bookEditingDto.id !== undefined && typeof bookEditingDto.id === "number" ? `Successfully edited book` : `Successfully created book`
+                        status: "error",
+                        text: data.errorMessage
                     })
-                    setEditRowIdx(-1);
-                })
-                .catch(error => {
-                    let data = error.response.data;
-                    if (data.errorMessage) {
-                        setToastNotification({
-                            show: true,
-                            status: "error",
-                            text: data.errorMessage
-                        })
-                    }
-                });
-        }
+                }
+            });
     }
 
     function changeCurrentlyTaken(id, changeType) {
@@ -135,7 +143,7 @@ const Books = ({ toastNotification, setToastNotification }) => {
             setToastNotification({
                 show: true,
                 status: "info",
-                text: "Click 'delete' one more time to confirm permanent delete of this book."
+                text: "Click 'Delete' one more time to confirm permanent delete of this book."
             })
             return ;
         }
@@ -266,22 +274,44 @@ const Books = ({ toastNotification, setToastNotification }) => {
                                         ))}
                                     </select>
                                 </div>
-                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].availableCopies ? books[0].availableCopies + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={bookEditingDto?.availableCopies ? bookEditingDto.availableCopies : 0} onChange={(e) => handleInputChange(e, "availableCopies")} type={"number"} onKeyDown={handleKeyPressBookEdit}/></div>
-                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].currentlyTaken ? books[0].currentlyTaken + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={bookEditingDto?.currentlyTaken ? bookEditingDto.currentlyTaken : 0} onChange={(e) => handleInputChange(e, "currentlyTaken")} type={"number"} onKeyDown={handleKeyPressBookEdit}/></div>
+                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].availableCopies ? books[0].availableCopies + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={bookEditingDto?.availableCopies ? bookEditingDto.availableCopies : 0} onChange={(e) => handleInputChange(e, "availableCopies")} type={"number"} onKeyDown={handleKeyPressBookEdit} min={0}/></div>
+                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].currentlyTaken ? books[0].currentlyTaken + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={bookEditingDto?.currentlyTaken ? bookEditingDto.currentlyTaken : 0} onChange={(e) => handleInputChange(e, "currentlyTaken")} type={"number"} onKeyDown={handleKeyPressBookEdit} min={0}/></div>
                             </div>
                         )}
                     </div>
                 ))}
             </div>
-            <div className={"flex items-center gap-2 mt-2 py-2 px-4 transition-all duration-300 w-fit bg-white/20 text-white hover:bg-white hover:text-black cursor-pointer"}
-                 onClick={() => prepareBookForCreating()}
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
-                     stroke="currentColor" className="w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round"
-                          d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/>
-                </svg>
-                Add a book
+            <div className={"flex gap-4"}>
+                <div className={(editRowIdx === -1 ? "flex" : "hidden") + " " + "items-center gap-2 mt-2 py-2 px-4 transition-all duration-300 w-fit bg-white/20 text-white hover:bg-white hover:text-black cursor-pointer"}
+                     onClick={() => prepareBookForCreating()}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
+                         stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                              d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/>
+                    </svg>
+                    Add a book
+                </div>
+                <div className={(editRowIdx === -1 ? "hidden" : "flex") + " " + "items-center gap-2 mt-2 py-2 px-4 transition-all duration-300 w-fit bg-white/20 text-white hover:bg-white hover:text-black cursor-pointer"}
+                     onClick={() => setEditRowIdx(-1)}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
+                         stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                              d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
+                    </svg>
+                    Cancel
+                </div>
+                <div className={(editRowIdx === -1 ? "hidden" : "flex") + " " + "items-center gap-2 mt-2 py-2 px-4 transition-all duration-300 w-fit bg-white/20 text-white hover:bg-white hover:text-black cursor-pointer"}
+                     onClick={() => saveOrEditBook()}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
+                         stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                              d="M9 3.75H6.912a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859M12 3v8.25m0 0l-3-3m3 3l3-3"/>
+                    </svg>
+                    Save
+                </div>
             </div>
         </div>
     );
