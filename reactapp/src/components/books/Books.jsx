@@ -3,9 +3,14 @@ import BookService from "../../repository/repository";
 
 const Books = ({ toastNotification, setToastNotification }) => {
     const [books, setBooks] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [authors, setAuthors] = useState([]);
+
     const [updateSwitch, setUpdateSwitch] = useState(false);
     const [markForDeleteId, setMarkForDeleteId] = useState(-1);
     const [editRowIdx, setEditRowIdx] = useState(-1);
+
+    const [bookEditingDto, setBookEditingDto] = useState({});
 
     const booksHeaderRow = [{name: "Name", category: "Category", author: "Author", availableCopies: "Available Copies", currentlyTaken: "Currently Taken Copies"}]
     const booksFooterRow = [{name: "", category: "", author: "", availableCopies: "", currentlyTaken: ""}]
@@ -13,12 +18,17 @@ const Books = ({ toastNotification, setToastNotification }) => {
     useEffect(() => {
         BookService.fetchAllBooks()
             .then(data => {
-                if (data.status === 200) {
-                    setBooks(booksHeaderRow.concat(data.data).concat(booksFooterRow));
-                }
-                else {
-                    console.log(data);
-                }
+                setBooks(booksHeaderRow.concat(data.data).concat(booksFooterRow));
+            });
+
+        BookService.fetchAllBookCategories()
+            .then(data => {
+                setCategories(data.data);
+            });
+
+        BookService.fetchAllAuthors()
+            .then(data => {
+                setAuthors(data.data);
             });
 
         let timeout = false;
@@ -32,6 +42,70 @@ const Books = ({ toastNotification, setToastNotification }) => {
             if (timeout) clearTimeout(timeout);
         }
     }, [updateSwitch, markForDeleteId])
+
+    function editBook(id) {
+        let idx = books.map(e => e.id).indexOf(id);
+        if (idx !== -1) {
+            setEditRowIdx(idx);
+            setBookEditingDto(books[idx]);
+            setToastNotification({
+                show: true,
+                status: 'info',
+                text: "When done editing, press 'Enter' to save."
+            });
+        }
+    }
+
+    function prepareBookForCreating() {
+        setEditRowIdx(books.length-1);
+        setBookEditingDto({author: authors[0], category: categories[0]});
+        setToastNotification({
+            show: true,
+            status: 'info',
+            text: "When done, press 'Enter' to save."
+        });
+    }
+
+    function handleInputChange(e, property) {
+        let newDto = {...bookEditingDto};
+
+        if (property === "author") {
+            let author = authors.filter(author => author.id == e.target.value)[0];
+            if (author) {
+                newDto[property] = author;
+            }
+        }
+        else {
+            newDto[property] = e.target.value;
+        }
+
+        setBookEditingDto(newDto);
+    }
+
+    function handleKeyPressBookEdit(e) {
+        if (e.key === 'Enter') {
+            BookService.saveOrEditBook(bookEditingDto.id, bookEditingDto.name, bookEditingDto.author?.id, bookEditingDto.category, bookEditingDto.availableCopies, bookEditingDto.currentlyTaken)
+                .then(data => {
+                    setUpdateSwitch(!updateSwitch);
+                    setToastNotification({
+                        show: true,
+                        status: "success",
+                        text: bookEditingDto.id !== undefined && typeof bookEditingDto.id === "number" ? `Successfully edited book` : `Successfully created book`
+                    })
+                    setEditRowIdx(-1);
+                })
+                .catch(error => {
+                    let data = error.response.data;
+                    if (data.errorMessage) {
+                        setToastNotification({
+                            show: true,
+                            status: "error",
+                            text: data.errorMessage
+                        })
+                    }
+                });
+        }
+    }
 
     function changeCurrentlyTaken(id, changeType) {
         BookService.changeCurrentlyTaken(id, changeType)
@@ -104,7 +178,7 @@ const Books = ({ toastNotification, setToastNotification }) => {
                                                         <div className={"relative flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].name ? books[0].name + ": " : ""}</span>{e.name}</div>
                                                     </div>
                                                     <div className={"flex items-center gap-2 py-2 px-4 transition-all duration-300 hover:bg-white hover:text-black cursor-pointer"}
-                                                         onClick={() => {setEditRowIdx(idx); setToastNotification({show: true, status: 'info', text: "When done editing, press 'Enter' to save."})}}
+                                                         onClick={() => editBook(e.id)}
                                                     >
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none"
                                                              viewBox="0 0 24 24" strokeWidth="1.5"
@@ -165,15 +239,49 @@ const Books = ({ toastNotification, setToastNotification }) => {
                             </>
                         ) : (
                             <div className={"grid grid-cols-1 lg:grid-cols-5 gap-4 items-center border-b border-b-white lg:border-b-0 py-4"}>
-                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].name ? books[0].name + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={e.name}/></div>
-                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].category ? books[0].category + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={e.category}/></div>
-                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].author ? books[0].author + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={(e.author.name ?? e.author) + " " + (e.author.surname ?? "")}/></div>
-                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].availableCopies ? books[0].availableCopies + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={e.availableCopies}/></div>
-                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].currentlyTaken ? books[0].currentlyTaken + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={e.currentlyTaken}/></div>
+                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].name ? books[0].name + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={bookEditingDto?.name ? bookEditingDto.name : ""} onChange={(e) => handleInputChange(e, "name")} onKeyDown={handleKeyPressBookEdit}/></div>
+                                <div className={"flex justify-between gap-6 w-full h-full"}><span className={"inline lg:hidden"}>{books[0].category ? books[0].category + ": " : ""}</span>
+                                    <select
+                                        className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"}
+                                        value={bookEditingDto?.category ? bookEditingDto.category : categories[0]}
+                                        onChange={(e) => handleInputChange(e, "category")}
+                                        onKeyDown={handleKeyPressBookEdit}
+                                    >
+                                        {categories.map((option) => (
+                                            <option key={option} value={option}>{option}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className={"flex justify-between gap-6 w-full h-full"}><span className={"inline lg:hidden"}>{books[0].author ? books[0].author + ": " : ""}</span>
+                                    <select
+                                        className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"}
+                                        value={`${bookEditingDto.author?.id ? bookEditingDto.author.id : authors[0].id}`}
+                                        onChange={(e) => handleInputChange(e, "author")}
+                                        onKeyDown={handleKeyPressBookEdit}
+                                    >
+                                        {authors.map((option) => (
+                                            <option key={option.id} value={option.id}>
+                                                {option.name + " " + option.surname}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].availableCopies ? books[0].availableCopies + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={bookEditingDto?.availableCopies ? bookEditingDto.availableCopies : 0} onChange={(e) => handleInputChange(e, "availableCopies")} type={"number"} onKeyDown={handleKeyPressBookEdit}/></div>
+                                <div className={"flex justify-between gap-6"}><span className={"inline lg:hidden"}>{books[0].currentlyTaken ? books[0].currentlyTaken + ": " : ""}</span><input className={"w-full rounded-none bg-black border border-white py-2 px-6 focus:border-transparent focus:outline-white/20"} value={bookEditingDto?.currentlyTaken ? bookEditingDto.currentlyTaken : 0} onChange={(e) => handleInputChange(e, "currentlyTaken")} type={"number"} onKeyDown={handleKeyPressBookEdit}/></div>
                             </div>
                         )}
                     </div>
                 ))}
+            </div>
+            <div className={"flex items-center gap-2 mt-2 py-2 px-4 transition-all duration-300 w-fit bg-white/20 text-white hover:bg-white hover:text-black cursor-pointer"}
+                 onClick={() => prepareBookForCreating()}
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
+                     stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round"
+                          d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/>
+                </svg>
+                Add a book
             </div>
         </div>
     );
