@@ -2,6 +2,13 @@ import React, {useEffect, useState} from 'react';
 import BookService from "../../repository/repository";
 
 const Books = ({ toastNotification, setToastNotification }) => {
+    const [paginationOptions, setPaginationOptions] = useState({
+        page: 0,
+        size: 5,
+        maxNumPages: 0,
+        paginationNumbers: [],
+    });
+
     const [books, setBooks] = useState([]);
     const [categories, setCategories] = useState([]);
     const [authors, setAuthors] = useState([]);
@@ -14,6 +21,44 @@ const Books = ({ toastNotification, setToastNotification }) => {
 
     const booksHeaderRow = [{name: "Name", category: "Category", author: "Author", availableCopies: "Available Copies", currentlyTaken: "Currently Taken Copies"}]
     const booksFooterRow = [{name: "", category: "", author: "", availableCopies: "", currentlyTaken: ""}]
+
+    function getPaginationNumbers(options) {
+        let paginationNumbers = [];
+        let paginationNumbersMobile = [];
+        let increments = [1, 2];
+
+        paginationNumbers.push(options.page);
+        paginationNumbersMobile = paginationNumbers.slice();
+
+        for (let i = 0; i < increments.length; i++) {
+            let increment = increments[i];
+            if (options.page - increment >= 0) paginationNumbers.unshift(options.page - increment);
+            if (options.page + increment <= parseInt(options.maxNumPages)-1) paginationNumbers.push(options.page + increment);
+
+            if (paginationNumbersMobile.length < 3) {
+                paginationNumbersMobile = paginationNumbers.slice();
+            }
+        }
+
+        let lastIncrement = increments[increments.length - 1];
+        if (options.page - lastIncrement - 2 >= 0) paginationNumbers.unshift("...");
+        if (options.page - lastIncrement - 1 >= 0) paginationNumbers.unshift(0);
+
+        if (options.page + lastIncrement + 2 <= parseInt(options.maxNumPages)-1) paginationNumbers.push("...");
+        if (options.page + lastIncrement + 1 <= parseInt(options.maxNumPages)-1) paginationNumbers.push(options.maxNumPages-1);
+
+        return paginationNumbers;
+    }
+
+    useEffect(() => {
+        let paginationNumbers = getPaginationNumbers(paginationOptions);
+
+        setPaginationOptions({
+            ...paginationOptions,
+            maxNumPages: Math.ceil((books.length-2) / paginationOptions.size),
+            paginationNumbers: paginationNumbers,
+        })
+    }, [paginationOptions.page, paginationOptions.size, books.length])
 
     useEffect(() => {
         BookService.fetchAllBookCategories()
@@ -30,7 +75,13 @@ const Books = ({ toastNotification, setToastNotification }) => {
     useEffect(() => {
         BookService.fetchAllBooks()
             .then(data => {
-                setBooks(booksHeaderRow.concat(data.data).concat(booksFooterRow));
+                let sortedData = data.data.sort((a, b) => a.name.localeCompare(b.name));
+                setPaginationOptions({
+                    ...paginationOptions,
+                    maxNumPages: Math.ceil(sortedData.length / paginationOptions.size),
+                    paginationNumbers: getPaginationNumbers({...paginationOptions, maxNumPages: Math.ceil(sortedData.length / paginationOptions.size)}),
+                })
+                setBooks(booksHeaderRow.concat(sortedData).concat(booksFooterRow));
             });
     }, [updateSwitch]);
 
@@ -61,6 +112,11 @@ const Books = ({ toastNotification, setToastNotification }) => {
     }
 
     function prepareBookForCreating() {
+        setPaginationOptions({
+            ...paginationOptions,
+            maxNumPages: (books.length-2)/paginationOptions.size == Math.ceil((books.length-2)/paginationOptions.size) ? paginationOptions.maxNumPages+1 : paginationOptions.maxNumPages,
+            page: (books.length-2)/paginationOptions.size == Math.ceil((books.length-2)/paginationOptions.size) ? paginationOptions.maxNumPages : paginationOptions.maxNumPages-1,
+        })
         setEditRowIdx(books.length-1);
         setBookEditingDto({author: authors[0], category: categories[0]});
         setToastNotification({
@@ -174,7 +230,7 @@ const Books = ({ toastNotification, setToastNotification }) => {
         <div>
             <div className={"flex flex-col gap-4"}>
                 {books.map((e, idx) => (
-                    <div key={e.name + idx} className={(idx === 0 ? "hidden lg:block bg-white/20 border-b border-b-white" : "") + " text-white text-xl mb-2 lg:mb-0"}>
+                    <div key={e.name + idx} className={(idx === 0 ? "hidden lg:block bg-white/20 border-b border-b-white" : "") + " text-white text-xl mb-2 lg:mb-0 " + (idx >= paginationOptions.page*paginationOptions.size+1 && idx < (paginationOptions.page+1)*paginationOptions.size+1 ? "block" : "hidden")}>
                         {editRowIdx !== idx || editRowIdx === 0 ? (
                             <>
                                 {e.name ? (
@@ -312,6 +368,78 @@ const Books = ({ toastNotification, setToastNotification }) => {
                     </svg>
                     Save
                 </div>
+            </div>
+
+            {/* Pagination */}
+            <div className={"mt-12"}>
+                {paginationOptions.maxNumPages > 0 && (
+                    <div className={`w-full flex justify-between items-center border-t-[1px] pt-2`}>
+                        {/* Previous Button */}
+                        <div className={"text-white py-4 px-4 transition-all duration-300 " + (paginationOptions.page !== 0 ? " cursor-pointer hover:bg-green-100/80 hover:text-black" : "")}
+                             onClick={() => setPaginationOptions({...paginationOptions, page: Math.max(paginationOptions.page-1, 0)})}
+                        >
+                            {paginationOptions.page !== 0 ? (
+                                <div className="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6 rotate-180">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+                                    </svg>
+                                    <span className="hidden lg:inline">Previous</span>
+                                    <span className="inline lg:hidden"></span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 opacity-50">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6 rotate-180">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+                                    </svg>
+                                    <span className="hidden lg:inline">Previous</span>
+                                    <span className="inline lg:hidden"></span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Numbers */}
+                        <div>
+                            <div className="text-white flex items-center py-4">
+                                {paginationOptions.paginationNumbers.map((number) => (
+                                    <div className={paginationOptions.paginationNumbers.includes(number) ? '' : 'hidden' + " lg:block"} key={number}>
+                                        {typeof number === 'number' ? (
+                                            number === paginationOptions.page ? (
+                                                <div className="text-white p-4 border-t-2 border-t-green-100/80">{number+1}</div>
+                                            ) : (
+                                                <div onClick={() => setPaginationOptions({...paginationOptions, page: number})}  className="cursor-pointer block p-4 transition-all duration-300 hover:bg-green-100/80 hover:text-black">{number+1}</div>
+                                            )
+                                        ) : (
+                                            <div className="p-4">{number+1}</div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Next Button */}
+                        <div className={"text-white py-4 px-4 transition-all duration-300 " + (parseInt(paginationOptions.maxNumPages) !== paginationOptions.page+1 ? " cursor-pointer hover:bg-green-100/80 hover:text-black" : "")}
+                             onClick={() => setPaginationOptions({...paginationOptions, page: Math.min(paginationOptions.page+1, paginationOptions.maxNumPages-1)})}
+                        >
+                            {parseInt(paginationOptions.maxNumPages) !== paginationOptions.page+1 ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="hidden lg:inline">Next</span>
+                                    <span className="inline lg:hidden"></span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 opacity-50">
+                                    <span className="hidden lg:inline">Next</span>
+                                    <span className="inline lg:hidden"></span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

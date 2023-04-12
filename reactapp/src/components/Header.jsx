@@ -13,8 +13,17 @@ const Header = () => {
                             <h1 className={"text-3xl text-white transition-all duration-300 group-hover:text-black"}>Doggo Library</h1>
                         </div>
                     </Link>
-                    <div>
-
+                    <div className={"flex items-center gap-4"}>
+                        <Link to={"/books"}>
+                            <div className={"flex gap-1 items-center bg-transparent transition-all duration-300 rounded-lg hover:bg-green-100/80 group py-2 px-6 cursor-pointer"}>
+                                <p className={"text-xl text-white transition-all duration-300 group-hover:text-black"}>Books</p>
+                            </div>
+                        </Link>
+                        <Link to={"/books/categories"}>
+                            <div className={"flex gap-1 items-center bg-transparent transition-all duration-300 rounded-lg hover:bg-green-100/80 group py-2 px-6 cursor-pointer"}>
+                                <p className={"text-xl text-white transition-all duration-300 group-hover:text-black"}>Categories</p>
+                            </div>
+                        </Link>
                     </div>
                 </div>
             </div>
